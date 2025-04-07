@@ -1,5 +1,67 @@
-- name: Run an Ad-hoc Command
-  hosts: localhost
+---
+- name: Verify connectivity to all inventory hosts
+  hosts: all
+  gather_facts: no
+
+  vars:
+    # Local directory to store JSON logs temporarily
+    local_log_dir: /tmp/ping_logs
+
+    # Per-host log filename (named after each host)
+    local_log_file: "{{ local_log_dir }}/ping_{{ inventory_hostname }}.json"
+
+    # Central log destination (adjust path as needed)
+    central_log_dir: /mnt/shared/logs  # For shared filesystem method
+
+    # Toggle to use HTTP POST instead of file copy
+    use_http_post: false
+
+    # REST API endpoint for sending logs (used if use_http_post = true)
+    central_log_api_url: "http://log-server.local/api/ping-log"
+
+  pre_tasks:
+    - name: Ensure the local log directory exists on the control node
+      ansible.builtin.file:
+        path: "{{ local_log_dir }}"
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+      run_once: true
+
   tasks:
-    - name: Ping all hosts
-      ansible.builin.command: ansible all -m ping
+    - name: Ping each host in the inventory
+      ansible.builtin.ping:
+      register: ping_result
+      ignore_errors: yes  # Continue play even if some hosts fail
+
+    - name: Save result as JSON log on the control node
+      ansible.builtin.copy:
+        dest: "{{ local_log_file }}"
+        content: |
+          {
+            "host": "{{ inventory_hostname }}",
+            "success": {{ ping_result is succeeded | to_json }},
+            "changed": {{ ping_result.changed | default(false) | to_json }},
+            "output": {{ ping_result | to_nice_json }}
+          }
+        mode: '0644'
+        force: true  # Overwrite old file if it exists
+      delegate_to: localhost
+
+    - name: Copy log file to centralized file share (if enabled)
+      ansible.builtin.copy:
+        src: "{{ local_log_file }}"
+        dest: "{{ central_log_dir }}/"
+      when: not use_http_post
+      delegate_to: localhost
+
+    - name: Send JSON log to central server via HTTP POST (if enabled)
+      ansible.builtin.uri:
+        url: "{{ central_log_api_url }}"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+        body: "{{ lookup('file', local_log_file) }}"
+        status_code: 200
+      when: use_http_post
+      delegate_to: localhost
