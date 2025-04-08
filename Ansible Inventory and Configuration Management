@@ -1,14 +1,76 @@
-- name: Generate a Dynamic Inventory File
+---
+- name: Generate a Dynamic Inventory File with Logging
   hosts: localhost
-  tasks:
-    - name: Create inventory file
-      ansible.builtin.copy:
-        dest: "/etc/ansible/hosts"
-        content: |
-          [web_servers]
-          web1.example.com
-          web2.example.com
+  gather_facts: false
+  become: true  # Required to write to /etc/ansible/hosts
 
-          [db_servers]
-          db1.example.com
-          db2.example.com
+  vars:
+    inventory_path: "/etc/ansible/hosts"
+    log_dir: "/var/log/ansible"
+    log_file: "{{ log_dir }}/generate_inventory_{{ inventory_hostname }}.log"
+    inventory_content: |
+      [web_servers]
+      web1.example.com
+      web2.example.com
+
+      [db_servers]
+      db1.example.com
+      db2.example.com
+
+  pre_tasks:
+
+    - name: Ensure log directory exists
+      ansible.builtin.file:
+        path: "{{ log_dir }}"
+        state: directory
+        mode: '0755'
+
+  tasks:
+
+    - name: Generate dynamic inventory file safely
+      block:
+
+        - name: Backup existing inventory if it exists
+          ansible.builtin.copy:
+            src: "{{ inventory_path }}"
+            dest: "{{ inventory_path }}.bak"
+            remote_src: true
+          ignore_errors: true
+
+        - name: Write inventory file
+          ansible.builtin.copy:
+            dest: "{{ inventory_path }}"
+            content: |
+              # {{ ansible_managed }}
+              {{ inventory_content }}
+            owner: root
+            group: root
+            mode: '0644'
+
+      rescue:
+
+        - name: Log failure to write inventory
+          ansible.builtin.copy:
+            dest: "{{ log_file }}"
+            content: |
+              {
+                "status": "failed",
+                "host": "{{ inventory_hostname }}",
+                "action": "write_inventory",
+                "timestamp": "{{ ansible_date_time.iso8601 }}",
+                "inventory_path": "{{ inventory_path }}"
+              }
+            mode: '0644'
+
+    - name: Log success
+      ansible.builtin.copy:
+        dest: "{{ log_file }}"
+        content: |
+          {
+            "status": "success",
+            "host": "{{ inventory_hostname }}",
+            "action": "write_inventory",
+            "timestamp": "{{ ansible_date_time.iso8601 }}",
+            "inventory_path": "{{ inventory_path }}"
+          }
+        mode: '0644'
