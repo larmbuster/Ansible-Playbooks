@@ -1,5 +1,56 @@
-- name: Lint Ansible Playbooks
+---
+- name: 🔍 Lint Ansible Playbooks with Logging and Best Practices
   hosts: localhost
+  gather_facts: false
+  become: false
+
+  vars:
+    playbook_to_lint: "/path/to/playbook.yml"                          # 🔧 Path to playbook you want to lint
+    lint_log_dir: "/var/log/ansible"
+    lint_log_file: "{{ lint_log_dir }}/ansible_lint_output.log"       # 📄 Human-readable output
+    lint_json_file: "{{ lint_log_dir }}/ansible_lint_{{ inventory_hostname }}.json"  # 🧾 JSON result
+
+  pre_tasks:
+
+    - name: 📁 Ensure lint log directory exists
+      ansible.builtin.file:
+        path: "{{ lint_log_dir }}"
+        state: directory
+        mode: '0755'
+
   tasks:
-    - name: Run ansible-lint
-      ansible.builtin.command: ansible-lint /path/to/playbook.yml
+
+    - name: 🔍 Run ansible-lint on target playbook
+      ansible.builtin.command:
+        cmd: "ansible-lint {{ playbook_to_lint }}"
+      register: lint_output
+      changed_when: false
+      failed_when: lint_output.rc != 0
+
+    - name: 📄 Save lint output to readable log
+      ansible.builtin.copy:
+        dest: "{{ lint_log_file }}"
+        content: "{{ lint_output.stdout }}"
+        mode: '0644'
+
+    - name: 🧾 Save JSON lint result
+      ansible.builtin.copy:
+        dest: "{{ lint_json_file }}"
+        content: |
+          {
+            "status": "{{ 'passed' if lint_output.rc == 0 else 'failed' }}",
+            "playbook": "{{ playbook_to_lint }}",
+            "host": "{{ inventory_hostname }}",
+            "exit_code": {{ lint_output.rc }},
+            "timestamp": "{{ ansible_date_time.iso8601 }}",
+            "stdout": {{ lint_output.stdout | to_json }}
+          }
+        mode: '0644'
+
+  post_tasks:
+
+    - name: ✅ Show lint summary result
+      ansible.builtin.debug:
+        msg: >
+          Lint check {{ 'passed ✅' if lint_output.rc == 0 else 'failed ❌' }}.
+          See logs: {{ lint_log_file }} and {{ lint_json_file }}
