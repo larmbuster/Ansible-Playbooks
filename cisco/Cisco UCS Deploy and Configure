@@ -1,0 +1,82 @@
+---
+- name: Deploy and configure Cisco UCS
+  hosts: ucs
+  gather_facts: no
+  vars_files:
+    - secrets.yml  # Encrypted credentials with Ansible Vault
+
+  tasks:
+    - name: Set UCSM connection details
+      ansible.builtin.set_fact:
+        ucs_auth:
+          hostname: "{{ ucs_host }}"
+          username: "{{ ucs_username }}"
+          password: "{{ ucs_password }}"
+      no_log: true  # Hides sensitive data
+
+    - name: Ensure UCS is reachable
+      cisco.ucs.ucs_facts:
+        hostname: "{{ ucs_auth.hostname }}"
+        username: "{{ ucs_auth.username }}"
+        password: "{{ ucs_auth.password }}"
+      register: ucs_facts
+      ignore_errors: yes
+      delegate_to: localhost
+      no_log: true
+
+    - name: Validate UCS Connection
+      ansible.builtin.fail:
+        msg: "Unable to connect to UCS. Please check credentials and network."
+      when: ucs_facts is not defined
+
+    - name: Configure UCS Fabric Interconnects
+      cisco.ucs.ucs_fi:
+        hostname: "{{ ucs_auth.hostname }}"
+        username: "{{ ucs_auth.username }}"
+        password: "{{ ucs_auth.password }}"
+        state: present
+        fi_name: "FI-A"
+        fi_model: "UCS 6332"
+        fi_state: "enabled"
+      register: fi_configuration
+      when: ucs_facts is defined
+      delegate_to: localhost
+      no_log: true
+
+    - name: Configure UCS Blade Chassis
+      cisco.ucs.ucs_blade:
+        hostname: "{{ ucs_auth.hostname }}"
+        username: "{{ ucs_auth.username }}"
+        password: "{{ ucs_auth.password }}"
+        state: present
+        blade_id: 1
+        blade_name: "Blade-1"
+        blade_model: "UCS B200 M5"
+      register: blade_configuration
+      when: ucs_facts is defined
+      delegate_to: localhost
+      no_log: true
+
+    - name: Configure VLANs
+      ansible.builtin.include_tasks: configure_vlan.yml
+      loop:
+        - { id: 10, name: "VLAN-10" }
+        - { id: 20, name: "VLAN-20" }
+      loop_control:
+        loop_var: vlan
+      when: ucs_facts is defined
+
+    - name: Validate UCS Configuration
+      cisco.ucs.ucs_validate:
+        hostname: "{{ ucs_auth.hostname }}"
+        username: "{{ ucs_auth.username }}"
+        password: "{{ ucs_auth.password }}"
+      register: ucs_validation
+      when: ucs_facts is defined
+      delegate_to: localhost
+      no_log: true
+
+    - name: Show UCS Validation Status
+      ansible.builtin.debug:
+        msg: "UCS Configuration Validation Result: {{ ucs_validation | default('No validation results available') }}"
+      when: ucs_validation is defined

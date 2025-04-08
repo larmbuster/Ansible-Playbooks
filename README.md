@@ -1,2 +1,12 @@
 # Ansible-Playbooks
-This branch is Ansible playbooks for Ansible tasks specifically. 
+Ansible playbooks for various technologies listed below. All playbooks are 90% there and need to be tweaked for individual environments. All playbooks
+are well noted.
+
+Cohesity
+Illumio
+Palo Alto
+Cisco UCS
+VMware
+Veeam
+OpenShift
+Juniper

@@ -1,0 +1,81 @@
+---
+- name: Deploy On-Prem AI for SIEM
+  hosts: on_prem_server
+  become: yes
+  vars:
+    log_forwarding_host: "192.168.1.100"
+    log_forwarding_port: 514
+    retention_days: 30
+    ai_model_gpu: true
+  tasks:
+
+    - name: Install required packages  # Installing essential dependencies including AI, logging, and monitoring tools
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - docker.io
+          - docker-compose
+          - rsyslog
+          - logrotate
+          - prometheus-node-exporter
+          - nvidia-container-toolkit  # Required for GPU acceleration
+        state: present
+        update_cache: yes
+
+    - name: Install Python dependencies  # AI/ML libraries needed for anomaly detection
+      pip:
+        name:
+          - tensorflow  # Deep learning framework
+          - scikit-learn  # Machine learning algorithms
+          - pandas  # Data handling
+          - flask  # Web API for model interaction
+          - torch  # PyTorch for deep learning
+
+    - name: Clone AI SIEM detection repository  # Fetching the latest AI model code
+      git:
+        repo: 'https://github.com/example/siem-ai-detection.git'
+        dest: /opt/siem-ai
+        version: main
+
+    - name: Deploy AI model container with GPU support  # Running the AI model in a container
+      docker_compose:
+        project_src: /opt/siem-ai
+        state: present
+      when: ai_model_gpu
+
+    - name: Configure Rsyslog for log forwarding  # Ensuring logs are forwarded to the centralized SIEM
+      lineinfile:
+        path: /etc/rsyslog.conf
+        line: "*.* @@{{ log_forwarding_host }}:{{ log_forwarding_port }}"
+        state: present
+
+    - name: Restart Rsyslog  # Apply Rsyslog configuration changes
+      systemd:
+        name: rsyslog
+        state: restarted
+        enabled: yes
+
+    - name: Configure log rotation  # Preventing excessive log storage
+      copy:
+        dest: /etc/logrotate.d/siem-ai
+        content: |
+          /var/log/siem-ai/*.log {
+            daily
+            rotate {{ retention_days }}
+            compress
+            missingok
+            notifempty
+          }
+
+    - name: Enable and start Prometheus Node Exporter  # Monitoring system performance
+      systemd:
+        name: prometheus-node-exporter
+        enabled: yes
+        state: started
+
+    - name: Enable and start Docker service  # Ensuring AI containers run on boot
+      systemd:
+        name: docker
+        enabled: yes
+        state: started

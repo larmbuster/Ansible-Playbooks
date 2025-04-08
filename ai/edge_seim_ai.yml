@@ -1,0 +1,126 @@
+---
+- name: 🚀 Deploy Edge AI for SIEM with Handlers and Centralized Logging
+  hosts: edge_device
+  become: true
+  gather_facts: true
+
+  vars:
+    log_forwarding_host: "192.168.1.100"
+    log_forwarding_port: 514
+    retention_days: 30
+    edge_ai_script: "/opt/edge_ai_detection.py"
+    edge_ai_service: "edge_ai"
+    rsyslog_custom_conf: "/etc/rsyslog.d/edge_ai_forwarding.conf"
+    logrotate_conf: "/etc/logrotate.d/edge-ai"
+
+  pre_tasks:
+    - name: 📁 Ensure required directories exist
+      ansible.builtin.file:
+        path: "/opt"
+        state: directory
+        mode: '0755'
+
+  tasks:
+
+    - name: 📦 Install system dependencies
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-pip
+          - rsyslog
+          - logrotate
+          - prometheus-node-exporter
+          - nvidia-container-toolkit
+        state: present
+        update_cache: true
+
+    - name: 🐍 Install Python ML libraries
+      ansible.builtin.pip:
+        name:
+          - numpy
+          - scikit-learn
+          - pandas
+
+    - name: 🧠 Deploy Edge AI script
+      ansible.builtin.copy:
+        src: ./edge_ai_detection.py
+        dest: "{{ edge_ai_script }}"
+        mode: '0755'
+        owner: root
+        group: root
+      notify: Restart Edge AI Service
+
+    - name: 📡 Configure centralized rsyslog forwarding (drop-in conf)
+      ansible.builtin.copy:
+        dest: "{{ rsyslog_custom_conf }}"
+        content: |
+          *.* @@{{ log_forwarding_host }}:{{ log_forwarding_port }}
+        mode: '0644'
+        owner: root
+        group: root
+      notify: Restart rsyslog
+
+    - name: 🔁 Configure logrotate for Edge AI logs
+      ansible.builtin.copy:
+        dest: "{{ logrotate_conf }}"
+        content: |
+          /var/log/edge-ai/*.log {
+            daily
+            rotate {{ retention_days }}
+            compress
+            missingok
+            notifempty
+          }
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: 📈 Enable & start Prometheus Node Exporter
+      ansible.builtin.systemd:
+        name: prometheus-node-exporter
+        state: started
+        enabled: true
+
+    - name: ⚙️ Create systemd service for Edge AI script
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/{{ edge_ai_service }}.service"
+        content: |
+          [Unit]
+          Description=Edge AI Log Analyzer
+          After=network.target
+
+          [Service]
+          ExecStart=/usr/bin/python3 {{ edge_ai_script }}
+          Restart=always
+          User=root
+          Environment=PYTHONUNBUFFERED=1
+
+          [Install]
+          WantedBy=multi-user.target
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Reload systemd
+
+    - name: 🚀 Enable and start Edge AI service
+      ansible.builtin.systemd:
+        name: "{{ edge_ai_service }}"
+        enabled: true
+        state: started
+
+  handlers:
+
+    - name: Restart rsyslog
+      ansible.builtin.systemd:
+        name: rsyslog
+        state: restarted
+        enabled: true
+
+    - name: Restart Edge AI Service
+      ansible.builtin.systemd:
+        name: "{{ edge_ai_service }}"
+        state: restarted
+        enabled: true
+
+    - name: Reload systemd
+      ansible.builtin.command: systemctl daemon-reexec
