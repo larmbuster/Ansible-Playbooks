@@ -1,5 +1,5 @@
 ---
-- name: 🚀 Deploy Edge AI for SIEM with Handlers and Centralized Logging
+- name: Deploy Edge AI for SIEM with Handlers and Centralized Logging
   hosts: edge_device
   become: true
   gather_facts: true
@@ -14,7 +14,7 @@
     logrotate_conf: "/etc/logrotate.d/edge-ai"
 
   pre_tasks:
-    - name: 📁 Ensure required directories exist
+    - name: Ensure required directories exist
       ansible.builtin.file:
         path: "/opt"
         state: directory
@@ -22,7 +22,7 @@
 
   tasks:
 
-    - name: 📦 Install system dependencies
+    - name: Install system dependencies
       ansible.builtin.apt:
         name:
           - python3
@@ -34,14 +34,14 @@
         state: present
         update_cache: true
 
-    - name: 🐍 Install Python ML libraries
+    - name: Install Python ML libraries
       ansible.builtin.pip:
         name:
           - numpy
           - scikit-learn
           - pandas
 
-    - name: 🧠 Deploy Edge AI script
+    - name: Deploy Edge AI script
       ansible.builtin.copy:
         src: ./edge_ai_detection.py
         dest: "{{ edge_ai_script }}"
@@ -50,7 +50,7 @@
         group: root
       notify: Restart Edge AI Service
 
-    - name: 📡 Configure centralized rsyslog forwarding (drop-in conf)
+    - name: Configure centralized rsyslog forwarding (drop-in conf)
       ansible.builtin.copy:
         dest: "{{ rsyslog_custom_conf }}"
         content: |
@@ -60,7 +60,7 @@
         group: root
       notify: Restart rsyslog
 
-    - name: 🔁 Configure logrotate for Edge AI logs
+    - name: Configure logrotate for Edge AI logs
       ansible.builtin.copy:
         dest: "{{ logrotate_conf }}"
         content: |
@@ -75,13 +75,13 @@
         group: root
         mode: '0644'
 
-    - name: 📈 Enable & start Prometheus Node Exporter
+    - name: Enable & start Prometheus Node Exporter
       ansible.builtin.systemd:
         name: prometheus-node-exporter
         state: started
         enabled: true
 
-    - name: ⚙️ Create systemd service for Edge AI script
+    - name: Create systemd service for Edge AI script
       ansible.builtin.copy:
         dest: "/etc/systemd/system/{{ edge_ai_service }}.service"
         content: |
@@ -102,7 +102,7 @@
         mode: '0644'
       notify: Reload systemd
 
-    - name: 🚀 Enable and start Edge AI service
+    - name: Enable and start Edge AI service
       ansible.builtin.systemd:
         name: "{{ edge_ai_service }}"
         enabled: true
