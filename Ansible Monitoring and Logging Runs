@@ -1,8 +1,68 @@
-- name: Enable Ansible Logging
+---
+- name: Enable Ansible Logging with Best Practices
   hosts: localhost
+  gather_facts: false
+  become: true  # Required to modify /etc/ansible/ansible.cfg and create /var/log
+
+  vars:
+    ansible_cfg_path: "/etc/ansible/ansible.cfg"
+    ansible_log_path: "/var/log/ansible/ansible.log"
+    log_dir: "/var/log/ansible"
+    json_log_file: "{{ log_dir }}/ansible_logging_setup_{{ inventory_hostname }}.log"
+    log_line: "log_path = {{ ansible_log_path }}"
+
+  pre_tasks:
+
+    - name: Ensure log directory exists
+      ansible.builtin.file:
+        path: "{{ log_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Ensure Ansible log file exists and is writable
+      ansible.builtin.file:
+        path: "{{ ansible_log_path }}"
+        state: touch
+        mode: '0644'
+        owner: root
+        group: root
+
   tasks:
+
+    - name: Backup existing ansible.cfg (if exists)
+      ansible.builtin.copy:
+        src: "{{ ansible_cfg_path }}"
+        dest: "{{ ansible_cfg_path }}.bak"
+        remote_src: true
+      ignore_errors: true
+
     - name: Configure ansible.cfg logging
       ansible.builtin.lineinfile:
-        path: "/etc/ansible/ansible.cfg"
-        line: "log_path = /var/log/ansible.log"
+        path: "{{ ansible_cfg_path }}"
+        regexp: "^log_path\s*="
+        line: "{{ log_line }}"
         state: present
+        insertafter: '[defaults]'
+        create: false
+        backup: true
+      register: log_config_result
+
+    - name: Log configuration result to JSON
+      ansible.builtin.copy:
+        dest: "{{ json_log_file }}"
+        content: |
+          {
+            "status": "{{ 'changed' if log_config_result.changed else 'ok' }}",
+            "host": "{{ inventory_hostname }}",
+            "log_line_added": "{{ log_line }}",
+            "ansible_cfg_path": "{{ ansible_cfg_path }}",
+            "timestamp": "{{ ansible_date_time.iso8601 }}"
+          }
+        mode: '0644'
+
+  post_tasks:
+
+    - name: Show status
+      ansible.builtin.debug:
+        msg: "✅ Logging has been configured in {{ ansible_cfg_path }}. Output goes to {{ ansible_log_path }}"
+
