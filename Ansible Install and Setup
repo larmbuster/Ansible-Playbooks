@@ -1,16 +1,83 @@
-- name: Install Ansible on Target Machines based on when conditionals
+---
+- name: Install Ansible on Target Machines with Dynamic Fallbacks
   hosts: target_servers
   become: true
-  tasks:
-      #ansible.builtin.package can be used for distribution agnostic package installs
-    - name: Install Ansible on Debian-based systems 
-      ansible.builtin.apt:
-        name: ansible
-        state: present
-      when: ansible_os_family == "Debian"
+  gather_facts: true
 
-    - name: Install Ansible on RHEL-based systems
-      ansible.builtin.dnf:
-        name: ansible
+  vars:
+    ansible_package_name: ansible
+    ansible_package_state: present
+    log_dir: "/var/log/ansible"
+    log_file: "{{ log_dir }}/ansible_install_{{ inventory_hostname }}.log"
+    use_pip_fallback: true
+    pip_install_cmd: "python3 -m pip install ansible"
+
+  pre_tasks:
+
+    - name: Ensure log directory exists
+      ansible.builtin.file:
+        path: "{{ log_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Ensure Python3 and pip are present for fallback
+      ansible.builtin.package:
+        name:
+          - python3
+          - python3-pip
         state: present
+      when: use_pip_fallback
+
+  tasks:
+
+    - name: Try installing Ansible on Debian-based systems
+      block:
+        - name: Install Ansible via apt
+          ansible.builtin.apt:
+            name: "{{ ansible_package_name }}"
+            state: "{{ ansible_package_state }}"
+            update_cache: true
+      rescue:
+        - name: Fallback to pip on Debian if apt install fails
+          ansible.builtin.command: "{{ pip_install_cmd }}"
+          when: use_pip_fallback
+      when: ansible_os_family == "Debian"
+      tags: [install, ansible]
+
+    - name: Try installing Ansible on RHEL-based systems
+      block:
+        - name: Install Ansible via dnf
+          ansible.builtin.dnf:
+            name: "{{ ansible_package_name }}"
+            state: "{{ ansible_package_state }}"
+      rescue:
+        - name: Fallback to pip on RHEL if dnf install fails
+          ansible.builtin.command: "{{ pip_install_cmd }}"
+          when: use_pip_fallback
       when: ansible_os_family == "RedHat"
+      tags: [install, ansible]
+
+    - name: Fail if unsupported OS
+      ansible.builtin.fail:
+        msg: "Unsupported OS family: {{ ansible_os_family }}. Cannot install Ansible."
+      when: ansible_os_family not in ["Debian", "RedHat"]
+      tags: [fail, ansible]
+
+    - name: Write JSON-formatted install log
+      ansible.builtin.copy:
+        dest: "{{ log_file }}"
+        content: |
+          {
+            "host": "{{ inventory_hostname }}",
+            "os_family": "{{ ansible_os_family }}",
+            "ansible_installed": true,
+            "install_method": "{% if use_pip_fallback %}package or pip fallback{% else %}package{% endif %}",
+            "timestamp": "{{ ansible_date_time.iso8601 }}"
+          }
+        mode: '0644'
+      tags: [log]
+
+  post_tasks:
+    - name: Print install success message
+      ansible.builtin.debug:
+        msg: "✅ Ansible is installed on {{ inventory_hostname }}"
