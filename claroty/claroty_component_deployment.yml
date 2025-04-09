@@ -1,10 +1,10 @@
 ---
 - name: Deploy Claroty CTD Server
   hosts: claroty_servers
-  become: yes
+  become: true
   tasks:
     - name: Install required dependencies
-      apt:
+      ansible.builtin.apt:
         name:
           - docker.io
           - curl
@@ -12,12 +12,12 @@
         update_cache: yes
 
     - name: Download Claroty CTD Installer
-      get_url:
+      ansible.builtin.get_url:
         url: "https://claroty.com/downloads/ctd_installer.sh"
         dest: "/tmp/ctd_installer.sh"
         mode: "0755"
 
     - name: Run Claroty CTD Installer
-      command: "/bin/bash /tmp/ctd_installer.sh"
+      ansible.builtin.command: "/bin/bash /tmp/ctd_installer.sh"
       args:
         creates: "/opt/claroty/ctd"

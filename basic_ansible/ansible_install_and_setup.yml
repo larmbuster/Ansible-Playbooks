@@ -2,8 +2,8 @@
   hosts: target_servers
   become: true
   tasks:
-      #ansible.builtin.package can be used for distribution agnostic package installs
-    - name: Install Ansible on Debian-based systems 
+      # ansible.builtin.package can be used for distribution agnostic package installs
+    - name: Install Ansible on Debian-based systems
       ansible.builtin.apt:
         name: ansible
         state: present

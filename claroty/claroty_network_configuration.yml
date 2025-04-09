@@ -1,7 +1,7 @@
 ---
 - name: Configure network settings for Claroty
   hosts: claroty_servers
-  become: yes
+  become: true
   tasks:
     - name: Enable IP forwarding
       sysctl:
@@ -10,7 +10,7 @@
         state: present
 
     - name: Allow Claroty communication ports
-      firewalld:
+      ansible.builtin.firewalld:
         port: 443/tcp
         permanent: yes
         state: enabled

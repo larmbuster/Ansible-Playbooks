@@ -1,5 +1,5 @@
 - name: Upgrade UCS Firmware
-  hosts: localhost
+  hosts: ucs
   gather_facts: no
   vars:
     ucs_hostname: "ucs-manager.example.com"

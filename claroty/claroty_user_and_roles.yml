@@ -3,7 +3,7 @@
   hosts: localhost
   tasks:
     - name: Create a new user
-      uri:
+      ansible.builtin.uri:
         url: "https://claroty.example.com/api/v1/users"
         method: POST
         body:
@@ -14,4 +14,4 @@
         headers:
           Content-Type: "application/json"
           Authorization: "Bearer your_api_token"
-        validate_certs: no
+        validate_certs: false

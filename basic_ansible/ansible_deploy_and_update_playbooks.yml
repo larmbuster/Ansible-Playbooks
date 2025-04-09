@@ -1,5 +1,6 @@
 - name: Deploy and Execute Ansible Playbook
-  hosts: localhost
+  hosts: all
+  become: true
   tasks:
     - name: Copy playbook to target
       ansible.builtin.copy:

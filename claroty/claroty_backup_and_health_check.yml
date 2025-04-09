@@ -1,10 +1,10 @@
 ---
 - name: Automate backups and system health checks for Claroty
   hosts: claroty_servers
-  become: yes
+  become: true
   tasks:
     - name: Create backup script
-      copy:
+      ansible.builtin.copy:
         dest: "/usr/local/bin/claroty_backup.sh"
         content: |
           #!/bin/bash
@@ -12,7 +12,7 @@
         mode: "0755"
 
     - name: Schedule backup via cron job
-      cron:
+      ansible.builtin.cron:
         name: "Daily Claroty Backup"
         job: "/usr/local/bin/claroty_backup.sh"
         state: present
@@ -20,9 +20,10 @@
         hour: "2"
 
     - name: Perform health check
-      command: "curl -k https://localhost:443/health"
+      ansible.builtin.command: "curl -k https://localhost:443/health"
       register: health_status
+      changed_when: false
 
     - name: Display health check result
-      debug:
+      ansible.builtin.debug:
         var: health_status.stdout

@@ -1,5 +1,5 @@
 - name: Configure UCSM Settings
-  hosts: localhost
+  hosts: ucs
   gather_facts: no
   vars:
     ucs_hostname: "ucs-manager.example.com"

@@ -1,5 +1,6 @@
-- name: Lint Ansible Playbooks
+- name: Lint Ansible Playbook
   hosts: localhost
   tasks:
     - name: Run ansible-lint
       ansible.builtin.command: ansible-lint /path/to/playbook.yml
+      changed_when: false

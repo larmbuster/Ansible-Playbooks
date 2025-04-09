@@ -26,7 +26,7 @@
       no_log: true  # Prevents credential exposure
 
     - name: Set hostname
-      ios_config:
+      cisco.ios.ios_config:
         lines:
           - hostname MyCiscoRouter
         authorize: yes
@@ -34,7 +34,7 @@
       no_log: true
 
     - name: Configure interface GigabitEthernet0/1
-      ios_config:
+      cisco.ios.ios_config:
         lines:
           - description Configured by Ansible
           - ip address 192.168.1.1 255.255.255.0
@@ -46,7 +46,7 @@
       no_log: true
 
     - name: Add static route
-      ios_config:
+      cisco.ios.ios_config:
         lines:
           - ip route 10.1.1.0 255.255.255.0 192.168.1.2
         authorize: yes
@@ -54,14 +54,14 @@
       no_log: true
 
     - name: Save running configuration to startup configuration
-      ios_config:
+      cisco.ios.ios_config:
         save_when: always
         authorize: yes
       when: ios_auth is defined
       no_log: true
 
     - name: Verify configuration (show running-config)
-      ios_command:
+      cisco.ios.ios_command:
         commands:
           - show running-config
       register: running_config_output

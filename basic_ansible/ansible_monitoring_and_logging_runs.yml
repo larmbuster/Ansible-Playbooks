@@ -1,4 +1,4 @@
-- name: Enable Ansible Logging
+- name: Change Ansible Log Location
   hosts: localhost
   tasks:
     - name: Configure ansible.cfg logging

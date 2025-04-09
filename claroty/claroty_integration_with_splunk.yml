@@ -1,15 +1,15 @@
 ---
 - name: Configure Claroty to send logs to Splunk
   hosts: claroty_servers
-  become: yes
+  become: true
   tasks:
     - name: Update Claroty log forwarding settings
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/claroty/log_forwarding.conf
         line: "splunk_server=splunk.example.com:9997"
         create: yes
 
     - name: Restart Claroty service to apply changes
-      service:
+      ansible.builtin.service:
         name: claroty
         state: restarted

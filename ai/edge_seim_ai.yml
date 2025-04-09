@@ -21,8 +21,7 @@
         mode: '0755'
 
   tasks:
-
-    - name: Install system dependencies
+    - name: Install system dependencies on Debian-based systems
       ansible.builtin.apt:
         name:
           - python3
@@ -33,6 +32,7 @@
           - nvidia-container-toolkit
         state: present
         update_cache: true
+      when: ansible_os_family == "Debian"
 
     - name: Install Python ML libraries
       ansible.builtin.pip:
@@ -109,7 +109,6 @@
         state: started
 
   handlers:
-
     - name: Restart rsyslog
       ansible.builtin.systemd:
         name: rsyslog
@@ -123,4 +122,5 @@
         enabled: true
 
     - name: Reload systemd
-      ansible.builtin.command: systemctl daemon-reexec
+      ansible.builtin.systemd:
+        daemon_reload: true
